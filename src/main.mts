@@ -173,7 +173,8 @@ function transformPoolsToTags(chainId: string, pools: Pool[]): ContractTag[] {
     const truncatedSymbolsText = truncateString(symbolsText, maxSymbolsLength);
     const tickSpacing = inferTickSpacing(pool.ticks);
     const feePct = formatFeeTier(pool.feeTier);
-    const prefix = tickSpacing ? `CL${tickSpacing} ` : "";
+    const KNOWN_TICK_SPACINGS = [1, 10, 50, 100, 200, 500, 1000, 2000];
+    const prefix = tickSpacing && KNOWN_TICK_SPACINGS.includes(tickSpacing) ? `CL${tickSpacing} ` : "";
     return {
       "Contract Address": `eip155:${chainId}:${pool.id}`,
       "Public Name Tag": `Aerodrome: ${prefix}${truncatedSymbolsText} (${feePct})`,
