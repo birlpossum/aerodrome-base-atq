@@ -163,7 +163,8 @@ function transformPoolsToTags(chainId: string, pools: Pool[]): ContractTag[] {
   // Helper to format feeTier as percent
   function formatFeeTier(feeTier: string): string {
     const bps = Number(feeTier);
-    return (bps / 100).toFixed(bps % 100 === 0 ? 0 : 2) + ' %';
+    // Divide by 10000 for percent (bps to percent)
+    return (bps / 10000).toFixed(2).replace(/\.00$/, '') + '%';
   }
 
   return validPools.map((pool) => {
@@ -171,14 +172,14 @@ function transformPoolsToTags(chainId: string, pools: Pool[]): ContractTag[] {
     const symbolsText = `${pool.token0.symbol.trim()}/${pool.token1.symbol.trim()}`;
     const truncatedSymbolsText = truncateString(symbolsText, maxSymbolsLength);
     const tickSpacing = inferTickSpacing(pool.ticks);
-    const prefix = tickSpacing ? `CL${tickSpacing}` : "CL?";
     const feePct = formatFeeTier(pool.feeTier);
+    const prefix = tickSpacing ? `CL${tickSpacing} ` : "";
     return {
       "Contract Address": `eip155:${chainId}:${pool.id}`,
-      "Public Name Tag": `Aerodrome: ${prefix} ${truncatedSymbolsText} (${feePct})`,
+      "Public Name Tag": `Aerodrome: ${prefix}${truncatedSymbolsText} (${feePct})`,
       "Project Name": "Aerodrome",
       "UI/Website Link": "https://aerodrome.finance",
-      "Public Note": `The Aerodrome liquidity pool contract for ${prefix} ${pool.token0.symbol}/${pool.token1.symbol} (${feePct}).`,
+      "Public Note": `The Aerodrome liquidity pool contract for ${prefix}${pool.token0.symbol}/${pool.token1.symbol} (fee tier: ${feePct}).`,
 
     };
   });
