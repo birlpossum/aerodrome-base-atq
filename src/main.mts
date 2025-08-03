@@ -20,11 +20,17 @@ interface Token {
   symbol: string;
 }
 
+interface Tick {
+  tickIdx: string;
+}
+
 interface Pool {
   id: string;
   createdAtTimestamp: number;
   token0: Token;
   token1: Token;
+  ticks: Tick[];
+  feeTier: string; // basis points, as string
 }
 
 interface GraphQLData {
@@ -47,6 +53,7 @@ const PAIR_QUERY = `
     ) {
       id
       createdAtTimestamp
+      feeTier
       token0 {
         symbol
         name
@@ -54,6 +61,9 @@ const PAIR_QUERY = `
       token1 {
         symbol
         name
+      }
+      ticks {
+        tickIdx
       }
     }
   }
@@ -138,17 +148,38 @@ function transformPoolsToTags(chainId: string, pools: Pool[]): ContractTag[] {
   }
 
   // Process valid pools into tags
+  // Helper to infer tick spacing from tickIdxs
+  function inferTickSpacing(ticks: Tick[]): number | undefined {
+    if (!ticks || ticks.length < 2) return undefined;
+    const idxs = ticks.map(t => Number(t.tickIdx)).sort((a, b) => a - b);
+    let minSpacing = Infinity;
+    for (let i = 1; i < idxs.length; i++) {
+      const diff = Math.abs(idxs[i] - idxs[i - 1]);
+      if (diff > 0 && diff < minSpacing) minSpacing = diff;
+    }
+    return isFinite(minSpacing) ? minSpacing : undefined;
+  }
+
+  // Helper to format feeTier as percent
+  function formatFeeTier(feeTier: string): string {
+    const bps = Number(feeTier);
+    return (bps / 100).toFixed(bps % 100 === 0 ? 0 : 2) + ' %';
+  }
+
   return validPools.map((pool) => {
     const maxSymbolsLength = 45;
     const symbolsText = `${pool.token0.symbol.trim()}/${pool.token1.symbol.trim()}`;
     const truncatedSymbolsText = truncateString(symbolsText, maxSymbolsLength);
-
+    const tickSpacing = inferTickSpacing(pool.ticks);
+    const prefix = tickSpacing ? `CL${tickSpacing}` : "CL?";
+    const feePct = formatFeeTier(pool.feeTier);
     return {
       "Contract Address": `eip155:${chainId}:${pool.id}`,
-      "Public Name Tag": `${truncatedSymbolsText} Pool`,
+      "Public Name Tag": `Aerodrome: ${prefix} ${truncatedSymbolsText} (${feePct})`,
       "Project Name": "Aerodrome",
       "UI/Website Link": "https://aerodrome.finance",
-      "Public Note": `The Aerodrome contract for the ${pool.token0.name.replace("USD//C", "USDC").trim()} (${pool.token0.symbol.trim()}) / ${pool.token1.name.replace("USD//C", "USDC").trim()} (${pool.token1.symbol.trim()}) pool.`,
+      "Public Note": `The Aerodrome liquidity pool contract for ${prefix} ${pool.token0.symbol}/${pool.token1.symbol} (${feePct}).`,
+
     };
   });
 }
